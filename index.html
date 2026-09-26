@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Class newspaper</title>
+<style>
+  :root {
+    --ink: #f4efe6;
+    --muted: rgba(244, 239, 230, 0.62);
+    --line: rgba(244, 239, 230, 0.16);
+    --bar: 76px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #100e0c;
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  body {
+    overflow: hidden;
+    height: 100dvh;
+  }
+  .reader {
+    position: relative;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background:
+      radial-gradient(ellipse 70% 60% at 50% 42%, #3a3126 0%, #1a1612 46%, #100e0c 100%);
+  }
+  .stage {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 22px 18px 6px;
+    perspective: 1800px;
+  }
+  .sheet {
+    height: 100%;
+    max-width: min(920px, 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sheet img {
+    display: block;
+    max-height: 100%;
+    max-width: 100%;
+    width: auto;
+    height: auto;
+    background: #f3efe6;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.35) inset,
+      0 18px 40px rgba(0, 0, 0, 0.45),
+      0 2px 6px rgba(0, 0, 0, 0.35);
+    user-select: none;
+    -webkit-user-drag: none;
+    transition: transform 240ms ease, opacity 240ms ease;
+  }
+  .sheet img.leave-next { transform: translateX(-7%) rotate(-0.4deg) scale(0.985); opacity: 0; }
+  .sheet img.leave-prev { transform: translateX(7%) rotate(0.4deg) scale(0.985); opacity: 0; }
+  .sheet img.enter-next { animation: from-right 260ms ease; }
+  .sheet img.enter-prev { animation: from-left 260ms ease; }
+  @keyframes from-right {
+    from { transform: translateX(7%) scale(0.985); opacity: 0; }
+    to { transform: none; opacity: 1; }
+  }
+  @keyframes from-left {
+    from { transform: translateX(-7%) scale(0.985); opacity: 0; }
+    to { transform: none; opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sheet img, .sheet img.leave-next, .sheet img.leave-prev { transition: none; transform: none; }
+    .sheet img.enter-next, .sheet img.enter-prev { animation: none; }
+  }
+  .hit {
+    position: absolute;
+    top: 0;
+    bottom: var(--bar);
+    width: min(18vw, 140px);
+    border: 0;
+    padding: 0;
+    background: transparent;
+    cursor: pointer;
+    z-index: 2;
+  }
+  .hit-prev { left: 0; }
+  .hit-next { right: 0; }
+  .hit:disabled { cursor: default; }
+  .hit:focus { outline: none; }
+  .bar {
+    height: var(--bar);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 0 16px calc(8px + env(safe-area-inset-bottom));
+    z-index: 3;
+  }
+  .bar button {
+    appearance: none;
+    min-width: 112px;
+    height: 44px;
+    padding: 0 16px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: rgba(244, 239, 230, 0.08);
+    color: var(--ink);
+    font: 600 15px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+  }
+  .bar button:hover:not(:disabled) { background: rgba(244, 239, 230, 0.16); }
+  .bar button:disabled { opacity: 0.35; cursor: default; }
+  .bar button:focus-visible { outline: 2px solid rgba(244, 239, 230, 0.7); outline-offset: 2px; }
+  .count {
+    min-width: 92px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-size: 15px;
+    letter-spacing: 0.04em;
+  }
+  .count .of { color: var(--muted); font-weight: 400; margin: 0 4px; }
+  .track {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 3px;
+    background: rgba(244, 239, 230, 0.08);
+  }
+  .track > span {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: #e7d7b1;
+    transition: width 240ms ease;
+  }
+  @media (max-width: 640px) {
+    .bar { gap: 10px; }
+    .bar button { min-width: 96px; padding: 0 12px; }
+    .stage { padding: 12px 8px 4px; }
+  }
+</style>
+</head>
+<body>
+  <div class="reader">
+    <button class="hit hit-prev" id="hitPrev" type="button" aria-label="Previous page"></button>
+    <button class="hit hit-next" id="hitNext" type="button" aria-label="Next page"></button>
+    <div class="stage">
+      <div class="sheet">
+        <img id="page" alt="Page 1 of the class newspaper" draggable="false">
+      </div>
+    </div>
+    <nav class="bar" aria-label="Page">
+      <button type="button" id="prev">Previous</button>
+      <div class="count" aria-live="polite"><span id="num">1</span><span class="of">of</span><span id="total">19</span></div>
+      <button type="button" id="next">Next</button>
+    </nav>
+    <div class="track" aria-hidden="true"><span id="fill"></span></div>
+  </div>
+<script>
+(function () {
+  var TOTAL = 19;
+  var page = 1;
+  var target = 1;
+  var busy = false;
+  var img = document.getElementById("page");
+  var num = document.getElementById("num");
+  var fill = document.getElementById("fill");
+  var prevBtn = document.getElementById("prev");
+  var nextBtn = document.getElementById("next");
+  var hitPrev = document.getElementById("hitPrev");
+  var hitNext = document.getElementById("hitNext");
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function src(n) {
+    return "pages/page_" + String(n).padStart(2, "0") + ".jpg";
+  }
+  function preload(n) {
+    if (n < 1 || n > TOTAL) return;
+    var el = new Image();
+    el.src = src(n);
+  }
+  function wait(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+  function paint() {
+    num.textContent = String(page);
+    img.alt = "Page " + page + " of the class newspaper";
+    fill.style.width = (page / TOTAL * 100) + "%";
+    var atStart = page <= 1;
+    var atEnd = page >= TOTAL;
+    prevBtn.disabled = atStart;
+    hitPrev.disabled = atStart;
+    nextBtn.disabled = atEnd;
+    hitNext.disabled = atEnd;
+    if (location.hash !== "#" + page) {
+      try { history.replaceState(null, "", "#" + page); } catch (err) { location.hash = String(page); }
+    }
+    preload(page - 1);
+    preload(page + 1);
+  }
+  function show(n) {
+    page = n;
+    target = n;
+    img.src = src(n);
+    paint();
+  }
+  function whenReady(url) {
+    return new Promise(function (resolve) {
+      var done = false;
+      function finish() { if (!done) { done = true; resolve(); } }
+      var incoming = new Image();
+      incoming.onload = incoming.onerror = finish;
+      incoming.src = url;
+      if (incoming.complete) finish();
+    });
+  }
+  function turn(delta) {
+    target = Math.max(1, Math.min(TOTAL, target + delta));
+    step();
+  }
+  function step() {
+    if (busy || target === page) return;
+    var n = target > page ? page + 1 : page - 1;
+    busy = true;
+    var forward = n > page;
+    var leave = forward ? "leave-next" : "leave-prev";
+    var enter = forward ? "enter-next" : "enter-prev";
+    var nextSrc = src(n);
+    whenReady(nextSrc).then(function () {
+      if (reduce) {
+        page = n;
+        img.src = nextSrc;
+        paint();
+        busy = false;
+        step();
+        return;
+      }
+      img.classList.add(leave);
+      return wait(200).then(function () {
+        img.style.transition = "none";
+        img.classList.remove(leave);
+        page = n;
+        img.src = nextSrc;
+        img.classList.add(enter);
+        paint();
+        void img.offsetWidth;
+        img.style.transition = "";
+        return wait(260);
+      }).then(function () {
+        img.classList.remove(enter);
+        busy = false;
+        step();
+      });
+    });
+  }
+
+  document.getElementById("total").textContent = String(TOTAL);
+  prevBtn.addEventListener("click", function () { turn(-1); });
+  nextBtn.addEventListener("click", function () { turn(1); });
+  hitPrev.addEventListener("click", function () { turn(-1); });
+  hitNext.addEventListener("click", function () { turn(1); });
+
+  document.addEventListener("keydown", function (event) {
+    var key = event.key;
+    if (key === "ArrowRight" || key === "PageDown" || key === " ") {
+      event.preventDefault();
+      turn(1);
+    } else if (key === "ArrowLeft" || key === "PageUp") {
+      event.preventDefault();
+      turn(-1);
+    } else if (key === "Home") {
+      event.preventDefault();
+      target = 1;
+      step();
+    } else if (key === "End") {
+      event.preventDefault();
+      target = TOTAL;
+      step();
+    }
+  });
+
+  var startX = null;
+  document.addEventListener("pointerdown", function (event) {
+    if (event.target.closest("button")) { startX = null; return; }
+    startX = event.clientX;
+  });
+  document.addEventListener("pointerup", function (event) {
+    if (startX == null) return;
+    var dx = event.clientX - startX;
+    startX = null;
+    if (Math.abs(dx) < 48) return;
+    turn(dx < 0 ? 1 : -1);
+  });
+  document.addEventListener("pointercancel", function () { startX = null; });
+
+  var fromHash = parseInt(String(location.hash).replace("#", ""), 10);
+  if (fromHash >= 1 && fromHash <= TOTAL) page = fromHash;
+  show(page);
+})();
+</script>
+</body>
+</html>
